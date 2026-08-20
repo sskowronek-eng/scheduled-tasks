@@ -1,38 +1,34 @@
 import os
-import datetime as dt
-import pandas
-import random
 import smtplib
 
-now = dt.datetime.now()
-current_month = float(now.month)
-current_day = float(now.day)
-
+api_key = os.environ.get("OWM_API_KEY")
 my_email = os.environ.get("MY_EMAIL")
 password = os.environ.get("MY_PASSWORD")
 
-df = pandas.read_csv("birthdays.csv")
+my_lat = 42.652401
+my_long = -83.132561
 
-birthdays = []
+parameters = {
+    "lat": my_lat,
+    "lon": my_long,
+    "cnt": 4,
+    "appid": api_key
+}
 
-if current_month in df.month.values and current_day in df.day.values:
-    birthday = df.loc[
-        (df.month == current_month) &
-        (df.day == current_day)
-    ]
-    birthdays = birthday.name.tolist()
+response = requests.get("https://api.openweathermap.org/data/2.5/forecast",params=parameters)
+response.raise_for_status()
+data = response.json()
+weather_id_list = [data["list"][number]["weather"][0]["id"] for number in range(0,4)
+                   if data["list"][number]["weather"][0]["id"] < 700]
 
-for recipient in birthdays:
-    num = random.randint(1,3)
-    with open(f"letter_templates/letter_{num}.txt") as letter:
-        letter_contents = letter.read()
-        new_letter = letter_contents.replace("[NAME]",recipient)
-
-    row = df[df.name == recipient]
-    email = row.email.iloc[0]
-
-    with smtplib.SMTP("smtp.gmail.com") as connection:
-        connection.starttls()
-        connection.login(user=my_email,password=password)
-        connection.sendmail(from_addr=my_email,to_addrs=email,
-                            msg=f"subject:Happy Birthday\n\n{new_letter}")
+with smtplib.SMTP("smtp.gmail.com") as connection:
+    connection.starttls()
+    connection.login(user=my_email, password=password)
+    if len(weather_id_list) > 0:
+        connection.sendmail(from_addr=my_email, to_addrs=my_email,
+                            msg="Subject:TUT TUT\n\n"
+                                "Rain is in the forecast. Remember your umbrella!")
+    else:
+        connection.sendmail(from_addr=my_email, to_addrs=my_email,
+                            msg="Subject:FROM NOW ON\n\n"
+                                "Blue skies smiling at me!")
